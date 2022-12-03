@@ -123,4 +123,4 @@ private:
         Assert(x, __assert_private_os.str());                                       \
     }
 
-#define RUN_TEST(tr, func) tr.RunTest(func, #func)
+#define RUN_TEST(tr, func) tr.RunTest(func, #func) 

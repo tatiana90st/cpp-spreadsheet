@@ -121,4 +121,4 @@ include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(
     ANTLR
     REQUIRED_VARS ANTLR_EXECUTABLE Java_JAVA_EXECUTABLE
-    VERSION_VAR ANTLR_VERSION)
+    VERSION_VAR ANTLR_VERSION) 

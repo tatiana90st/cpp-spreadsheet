@@ -14,8 +14,7 @@ else()
   )
 endif()
 
-
-set(ANTLR_EXECUTABLE ${CMAKE_CURRENT_SOURCE_DIR}/antlr-4.7.2-complete.jar)
+set(ANTLR_EXECUTABLE ${CMAKE_CURRENT_SOURCE_DIR}/antlr-4.11.1-complete.jar)
 include(${CMAKE_CURRENT_SOURCE_DIR}/FindANTLR.cmake)
 
 add_definitions(
@@ -53,4 +52,4 @@ install(
   EXPORT spreadsheet
 )
 
-set_directory_properties(PROPERTIES VS_STARTUP_PROJECT spreadsheet)
+set_directory_properties(PROPERTIES VS_STARTUP_PROJECT spreadsheet) 

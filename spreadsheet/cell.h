@@ -2,35 +2,50 @@
 
 #include "common.h"
 #include "formula.h"
+#include "sheet.h"
 
+#include <set>
 #include <functional>
 #include <unordered_set>
+#include <optional>
 
-class Sheet;
+//class Sheet;
 
 class Cell : public CellInterface {
 public:
-    Cell(Sheet& sheet);
-    ~Cell();
+        Cell(Sheet& sheet, Position pos);
+        virtual ~Cell();
 
-    void Set(std::string text);
-    void Clear();
+        void Set(std::string text);
+        void Clear();
 
-    Value GetValue() const override;
-    std::string GetText() const override;
-    std::vector<Position> GetReferencedCells() const override;
+        Value GetValue() const override;
+        std::string GetText() const override;
+        std::vector<Position> GetReferencedCells() const override;
 
-    bool IsReferenced() const;
+        bool IsReferenced() const;
+
+        bool HasCache() const;
+
+        Position GetCellPosition() const;
 
 private:
-    class Impl;
-    class EmptyImpl;
-    class TextImpl;
-    class FormulaImpl;
+        class Impl;
+        class EmptyImpl;
+        class TextImpl;
+        class FormulaImpl;
 
-    std::unique_ptr<Impl> impl_;
+        std::unique_ptr<Impl> impl_;
+        Sheet& belongs_to_;
+        Position position_;
 
-    // Р”РѕР±Р°РІСЊС‚Рµ РїРѕР»СЏ Рё РјРµС‚РѕРґС‹ РґР»СЏ СЃРІСЏР·Рё СЃ С‚Р°Р±Р»РёС†РµР№, РїСЂРѕРІРµСЂРєРё С†РёРєР»РёС‡РµСЃРєРёС… 
-    // Р·Р°РІРёСЃРёРјРѕСЃС‚РµР№, РіСЂР°С„Р° Р·Р°РІРёСЃРёРјРѕСЃС‚РµР№ Рё С‚. Рґ.
+        std::set<Cell*> referencies_; //ячейки, к которым this обращается в формуле
+        std::set<Cell*> dependable_; //ячейки, которые ссылаются на this
 
+        std::optional<std::set<Cell*>> HasCircularDependenciesPos(const Impl& impl);
+        
+        mutable std::optional<Value> cache_;
+        void InvalidateCache();
+
+        void ClearReferences();
 };

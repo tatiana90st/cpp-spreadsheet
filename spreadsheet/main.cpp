@@ -1,5 +1,6 @@
 #include "common.h"
 #include "formula.h"
+#include "cell.h"
 #include "test_runner_p.h"
 
 inline std::ostream& operator<<(std::ostream& output, Position pos) {
@@ -332,6 +333,18 @@ void TestFormulaIncorrect() {
 
 void TestCellCircularReferences() {
     auto sheet = CreateSheet();
+
+    {
+        bool caught = false;
+        try {
+            sheet->SetCell("A1"_pos, "=A1");
+        }
+        catch (const CircularDependencyException&) {
+            caught = true;
+        }
+        ASSERT(caught);
+    }
+
     sheet->SetCell("E2"_pos, "=E4");
     sheet->SetCell("E4"_pos, "=X9");
     sheet->SetCell("X9"_pos, "=M6");
@@ -347,6 +360,88 @@ void TestCellCircularReferences() {
     ASSERT(caught);
     ASSERT_EQUAL(sheet->GetCell("M6"_pos)->GetText(), "Ready");
 }
+
+void MyTestCache() {
+    auto sheet_int = CreateSheet();
+    
+    sheet_int->SetCell("A1"_pos, "=1+2*3");
+    const CellInterface* cell_int = sheet_int->GetCell("A1"_pos);
+    const Cell* cell = dynamic_cast<const Cell*>(cell_int);
+    ASSERT(!cell->HasCache());
+    cell->GetValue();
+    ASSERT(cell->HasCache());
+
+    sheet_int->SetCell("A1"_pos, "=A2+B2");
+    sheet_int->SetCell("B2"_pos, "=C3*4");
+    ASSERT(!cell->HasCache());
+    cell->GetValue();
+    ASSERT(cell->HasCache());
+
+    CellInterface* cell_int2 = sheet_int->GetCell("A2"_pos);
+    Cell* cell2 = dynamic_cast<Cell*>(cell_int2);
+    ASSERT(cell2->HasCache());//есть кэш потому что вычисляли значение А1, а вместе с ней и всех зависимых
+
+    cell2->Set("2");
+    ASSERT(!cell2->HasCache());
+    ASSERT(!cell->HasCache());//кэш зависимой ячейки должен инвалидироваться, когда меняется значение ячейки, на которую она ссылается
+
+    cell2->GetValue();
+    ASSERT(cell2->HasCache());
+    ASSERT(!cell->HasCache());//кэш зависимой ячейки остается невалидным до тех пор, пока не придет команда посчитать ее новое значение
+
+    cell->GetValue();
+    ASSERT(cell->HasCache());
+    CellInterface* cell_int3 = sheet_int->GetCell("C3"_pos);
+    Cell* cell3 = dynamic_cast<Cell*>(cell_int3);
+    ASSERT(cell3->HasCache()); //высчитывался, когда считали A1
+    cell3->Set("50");
+    ASSERT(!cell3->HasCache());
+    ASSERT(!cell->HasCache());
+    ASSERT(cell2->HasCache());
+    cell3->GetValue();
+}
+
+void MyTestPrint() {
+    auto sheet = CreateSheet();
+
+    sheet->SetCell("A1"_pos, "=(1+2)*3");
+    sheet->SetCell("B1"_pos, "=1+(2*3)");
+    sheet->SetCell("A2"_pos, "some");
+    sheet->SetCell("B2"_pos, "text");
+    sheet->SetCell("C2"_pos, "here");
+    sheet->SetCell("C3"_pos, "\'and");
+    sheet->SetCell("D3"_pos, "\'here");
+    sheet->SetCell("B5"_pos, "=1/0");
+
+    sheet->SetCell("F10"_pos, "to be erazed");
+    ASSERT_EQUAL(sheet->GetPrintableSize(), (Size{ 10, 6 }));
+    sheet->SetCell("F5"_pos, "and this one");
+    ASSERT_EQUAL(sheet->GetPrintableSize(), (Size{ 10, 6 }));
+    sheet->ClearCell("F10"_pos);
+    ASSERT_EQUAL(sheet->GetPrintableSize(), (Size{ 5, 6 }));
+    sheet->ClearCell("F5"_pos);
+    ASSERT_EQUAL(sheet->GetPrintableSize(), (Size{ 5, 4 }));
+    sheet->SetCell("B4"_pos, "to be erazed too");
+    ASSERT_EQUAL(sheet->GetPrintableSize(), (Size{ 5, 4 }));
+    sheet->ClearCell("B4"_pos);
+
+    ASSERT_EQUAL(sheet->GetPrintableSize(), (Size{ 5, 4 }));
+
+    std::ostringstream vals;
+    sheet->PrintValues(vals);
+    ASSERT_EQUAL(vals.str(), "9\t7\t\t\nsome\ttext\there\t\n\t\tand\there\n\t\t\t\n\t#DIV/0!\t\t\n");
+
+
+    sheet->ClearCell("B5"_pos);
+
+    ASSERT_EQUAL(sheet->GetPrintableSize(), (Size{ 3, 4 }));
+    std::ostringstream vals2;
+    sheet->PrintValues(vals2);
+    ASSERT_EQUAL(vals2.str(), "9\t7\t\t\nsome\ttext\there\t\n\t\tand\there\n");
+    std::ostringstream texts;
+    sheet->PrintTexts(texts);
+}
+
 }  // namespace
 
 int main() {
@@ -370,4 +465,7 @@ int main() {
     RUN_TEST(tr, TestCellReferences);
     RUN_TEST(tr, TestFormulaIncorrect);
     RUN_TEST(tr, TestCellCircularReferences);
-}
+    RUN_TEST(tr, MyTestCache);
+    RUN_TEST(tr, MyTestPrint);
+    return 0;
+} 
